@@ -1,6 +1,5 @@
-import itertools
-import math
-import wave
+from math import sin, exp, pi, e
+from wave import open
 from array import array
 
 PROGRESSION = ["Cmaj7", "Dm7", "G7", "C6"]
@@ -26,7 +25,7 @@ class Voice(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if self.t >= self.length:
             self.released = True
             self.adsr.trigger_release()
@@ -42,14 +41,14 @@ class Voice(object):
 class ADSREnvelope(object):
     """ ADSR envelope generator class """
 
-    RATIO = 1.0 - 1.0 / math.e
+    RATIO = 1.0 - 1.0 / e
 
     def __init__(self, attack, decay, sustain, release):
         self.attacking = True
         self.released = False
         self.level = 0.0
 
-        compute_coefficient = lambda time: 1.0 - math.exp(-1.0 / (time * 44100.0))
+        compute_coefficient = lambda time: 1.0 - exp(-1.0 / (time * 44100.0))
 
         self.attack = compute_coefficient(attack)
         self.decay = compute_coefficient(decay)
@@ -62,7 +61,7 @@ class ADSREnvelope(object):
     def trigger_release(self):
         self.released = True
 
-    def next(self):
+    def __next__(self):
         if self.released:
             self.level += self.release * (1.0 - (1.0 / self.RATIO) - self.level)
             if self.level < 0.0:
@@ -84,10 +83,10 @@ def oscillator(pitch):
     """ Generate a waveform at a given pitch """
     phi = 0.0
     frequency = (2.0 ** ((pitch - 69.0) / 12.0)) * 440.0
-    delta = 2.0 * math.pi * frequency / 44100.0
+    delta = 2.0 * pi * frequency / 44100.0
 
     while True:
-        yield math.sin(phi) + math.sin(2.0 * phi)
+        yield sin(phi) + sin(2.0 * phi)
         phi += delta
 
 def amplifier(gain, iterable):
@@ -150,7 +149,7 @@ def voice_combiner(iterable):
 
         # stop yielding if we're done
         if stopping and len(voice_pool) == 0:
-            raise StopIteration
+            return 
 
         yield sample
         t += 1000.0 / 44100.0
@@ -168,13 +167,12 @@ attenuated_samples = amplifier(0.5, samples)
 output = quantizer(attenuated_samples)
 
 # prepare audio stream
-audiofile = wave.open("output.wav", "wb")
+audiofile = open("output.wav", "wb")
 audiofile.setnchannels(1)
 audiofile.setsampwidth(2)
 audiofile.setframerate(44100)
 
 # render samples
-output = list(output)
-audiofile.writeframes(array('h', output))
-audiofile.writeframes(array('h', output))
+for sample in output:
+    audiofile.writeframes(array('h', [sample]))
 audiofile.close()
